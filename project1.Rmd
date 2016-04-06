@@ -1,0 +1,89 @@
+---
+title: Traffic Data Analysis
+---
+```{r}
+library(ggplot2)
+library(dplyr)
+library(ggmap)
+library(rmarkdown)
+```
+#Reading data from csv file
+```{r}
+data.all <- read.csv(file="all-semi-unique.csv",head=TRUE,sep=",")
+summary(data.all)
+```
+Check dimensions of the data
+```{r}
+dim(data.all)
+```
+Check columns with one unique value
+```{r}
+unique.cols.cnt = sapply(data.all, function(x) length(unique(x)))
+unique.cols.cnt
+```
+From the data, it is clear that all the advertisement columns in addition to the "rd.rp.type" and "rd.cl" have only one value and hence can be neglected.
+```{r}
+data.multivalue.cols <- data.all[, !names(data.all) %in% names(unique.cols.cnt[unique.cols.cnt==1])]
+dim(data.multivalue.cols)
+```
+Before dealing with the NA values and duplicated rows, the semantic meaning of the columns' names has to be investigated first. After observing the html files of the crawled website, the potential meanings of the columns' names can be summarized in the following table:
+
+
+Let's remove the duplicate rows accorrding to the rd.rp.cmid
+```{r}
+data.noduplicatedrows <- data.multivalue.cols[!duplicated(data.multivalue.cols$rd.rp.cmid),]
+dim(data.noduplicatedrows)
+```
+The number of rows is reduced drastically
+Now that all the columns have 2 or more unique values, let's have a look on the NA's
+```{r}
+nas.cnt = sapply(data.noduplicatedrows, function(x) sum(is.na(x)))
+nas.cnt
+```
+Before excluding the rd.rp.fullnm because it adds no information especially that the username is given by the rd.rp.nm column, let's check on the percentage of users who do not choose a full name:
+```{r}
+nas.cnt["rd.rp.fullnm"]/nrow(data.noduplicatedrows)
+```
+Same applies for the number of people who have a profile picture which is saved in the column rd.rp.img. Let's see the percentage of users not having a profile picture:
+```{r}
+nas.cnt["rd.rp.img"]/nrow(data.noduplicatedrows)
+```
+Let's remove the rd.rp.fullnm and rd.rp.img columns
+```{r}
+data.rm.nas <- data.noduplicatedrows[ , !(names(data.noduplicatedrows) %in% c("rd.rp.fullnm","rd.rp.img"))]
+dim(data.rm.nas)
+nas.cnt = sapply(data.rm.nas, function(x) sum(is.na(x)))
+nas.cnt
+```
+Now let's examine the rd.rp.rpImg column which indicates that teh report has an image attached to it.
+```{r}
+nas.cnt["rd.rp.rpImg"]/nrow(data.noduplicatedrows)
+```
+Hence, the percentage of people not attaching a photo to the report is great. Let's examine the common staus of roads when people usually attach an image
+```{r}
+attached.images <- data.rm.nas %>% filter(!is.na(rd.rp.rpImg)) %>% select(rd.rp.stid) %>% group_by(rd.rp.stid) %>% summarise(n=n()) %>% arrange(desc(n))
+temp <- (data.rm.nas %>% filter(!is.na(rd.rp.rpImg)) %>% select(rd.rp.stid) %>% filter(!is.na(rd.rp.stid)))
+attached.images
+ggplot() + geom_histogram(data = temp, aes(x=rd.rp.stid,y = (..count..)/sum(..count..)))+scale_x_continuous(name="Road Status")+scale_y_continuous(name="Percentage of attached pictures")
+```
+
+From the plot it is clear that people tend to post pictures indicating empty roads rather than blocked roads.
+
+No let's keep dealing with the NA values of the data. The three columns rd.stid, rd.hr and rd.mn do not add any extra information about the roads and are considered redundant since they are aggregation of data of reports. So they are removed along with rd.rp.rpImg after extracting meaningful information from it in previous steps
+
+also removed rd.img column temporarly because its meaning is not clear so far and contains many NAs.
+```{r}
+data.rm.nas2 <- data.rm.nas[ , !(names(data.rm.nas) %in% c("rd.stid", "rd.hr" , "rd.mn","rd.rp.rpImg","rd.img"))]
+dim(data.rm.nas2)
+nas.cnt = sapply(data.rm.nas2, function(x) sum(is.na(x)))
+nas.cnt
+```
+Ultimately, only one column rd.rp.stid still contains NAs, let's have a look on some of the rows with NA value in that column:
+```{r}
+temp <- data.rm.nas2 %>% filter(is.na(rd.rp.stid))
+temp[sample(nrow(temp), 400), ]
+```
+In order take the temp data frame to open refine, it needs to be exported as a csv file:
+```{r}
+write.csv(file="test.csv",x=temp)
+```
