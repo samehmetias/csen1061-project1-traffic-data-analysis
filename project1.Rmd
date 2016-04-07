@@ -251,3 +251,4 @@ secondPlot("Batal Ahmed St.;Gam3et Dowal To Orman")
 firstPlot("Faissal St.;Remaya Sq. To Giza Sq.")
 secondPlot("Faissal St.;Remaya Sq. To Giza Sq.")
 ```
+The outliers in the boxplots indicate unclean data points that need to be neglected and the curves of the average lines have the tendency to show heavy traffic during mid day.
