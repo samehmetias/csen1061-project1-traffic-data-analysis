@@ -11,24 +11,33 @@ library(knitr)
 #Reading data from csv file
 ```{r}
 data.all <- read.csv(file="all-semi-unique.csv",head=TRUE,sep=",")
-(summary(data.all)) %>% kable()
+summary(data.all)
 ```
+
 Check dimensions of the data
 ```{r}
 dim(data.all)
 ```
+
 Check columns with one unique value
 ```{r}
 unique.cols.cnt = sapply(data.all, function(x) length(unique(x)))
 unique.cols.cnt
 ```
+
 From the data, it is clear that all the advertisement columns in addition to the "rd.rp.type" and "rd.cl" have only one value and hence can be neglected.
 ```{r}
 data.multivalue.cols <- data.all[, !names(data.all) %in% names(unique.cols.cnt[unique.cols.cnt==1])]
 dim(data.multivalue.cols)
 ```
-Before dealing with the NA values and duplicated rows, the semantic meaning of the columns' names has to be investigated first. After observing the html files of the crawled website, the potential meanings of the columns' names can be summarized in the following table:
 
+Before dealing with the NA values and duplicated rows, the semantic meaning of the columns' names has to be investigated first. After observing the html files of the crawled website, the potential meanings of the columns' names can be summarized in the following table:
+```{r}
+lbl<-c(1,2,3,4,5,6,7,8,9,10)
+mng<-c("halawa","laziz","mashy","zahma","mafish amal","Question","Radar/Lagna","Aaccident","Construction","Automatic report")
+tbl<-cbind(lbl,mng)
+tbl%>%kable()
+```
 
 Let's remove the duplicate rows accorrding to the rd.rp.cmid
 ```{r}
@@ -96,7 +105,7 @@ write.csv(file="test.csv",x=temp)
 ```
 
 For some reason, open refine does not compute the clusters as shown in the screenshot:
-
+![Open Refine](Selection_014.png)
 This is why we needed to impute the missing NAs through some other way. The following commands were tested:
 ```{r, eval=F}
 library("DMwR")
@@ -191,12 +200,20 @@ Now let's examine the users' activities with respect to the time of the day
 ```{r}
 ggplot(data = data.semi.ready, aes(report.time.hour)) + geom_bar()+facet_wrap(~ rd.rp.stid)+labs(title="Number of reports")+ geom_bar()+ theme(axis.text.x = element_text(angle = 90, hjust = 1))
 ```
+
+The cummilative plot of the plots above is the following
+```{r}
+ggplot(data = data.semi.ready, aes(x=report.time.hour)) + geom_bar()+labs(title="Number of reports")+ theme(axis.text.x = element_text(angle = 90, hjust = 1))
+```
+Notice the two peeks which indicate the peeks reporting.
+
 In order to examine the top reporters on the website, we consider the following table:
 ```{r}
 data.reporters <- data.semi.ready%>%group_by(rd.rp.nm)%>%summarise(n=n())%>%arrange(desc(n))
 nrow(data.reporters)
 data.reporters %>%head(n=10)%>% kable()
 ```
+
 
 To examine the freqency of reports of single user in one hour, consider the following table
 ```{r}
@@ -207,8 +224,30 @@ data.reporters %>%head(n=10)%>% kable()
 
 The table shows weird behavior for user "007", because 29 reports in a single hour is not a logical number. Hence let's examine those rows carefully:
 ```{r}
-
 data.semi.ready %>% filter(rd.rp.nm=="007",report.time.hrs=="16-02-15 05")%>%arrange(desc(report.time))%>%select(report.time,rd.nm,rd.rp.cm)%>%kable()
 ```
 
 From the table we can clearly see that this data is not correct and should not be considered for future computations.
+
+In order to monitor the average traffic over the day for a sample roads consider the following two plots:
+```{r}
+firstPlot <- function(x){
+ggplot(data.semi.ready%>%filter(rd.nm==x,rd.rp.stid %in% c(1,2,3,4,5)), aes(x=report.time.hour, y=rd.rp.stid, fill=rd.rp.stid)) + geom_boxplot()+labs(title=x)
+  
+}
+
+secondPlot <- function(x){
+  t1 <- data.semi.ready%>%filter(rd.nm==x,rd.rp.stid %in% c(1,2,3,4,5))%>%group_by(report.time.hour)%>%summarise(avg=mean(rd.rp.stid),med=median(rd.rp.stid))
+
+ggplot(data = t1, aes(x=report.time.hour,y=avg,group = 1)) + stat_smooth()+labs(title=x)
+}
+
+firstPlot("Kobry 6 October;Mohandesin To Ta7rir")
+secondPlot("Kobry 6 October;Mohandesin To Ta7rir")
+
+firstPlot("Batal Ahmed St.;Gam3et Dowal To Orman")
+secondPlot("Batal Ahmed St.;Gam3et Dowal To Orman")
+
+firstPlot("Faissal St.;Remaya Sq. To Giza Sq.")
+secondPlot("Faissal St.;Remaya Sq. To Giza Sq.")
+```
